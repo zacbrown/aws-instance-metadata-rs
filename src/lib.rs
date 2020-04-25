@@ -29,7 +29,7 @@ fn identity_credentials_to_account_id(ident_creds: &str) -> String {
     parsed["AccountId"].to_string()
 }
 
-fn availability_zone_to_region(availability_zone: &str) -> Option<&'static str> {
+fn availability_zone_to_region(availability_zone: &str) -> Result<&'static str> {
     const REGIONS: &[&str] = &[
         "ap-south-1",
         "eu-west-3",
@@ -54,13 +54,62 @@ fn availability_zone_to_region(availability_zone: &str) -> Option<&'static str> 
 
     for region in REGIONS {
         if availability_zone.starts_with(region) {
-            return Some(region);
+            return Ok(region);
         }
     }
 
-    None
+    Err(Error::UnknownAvailabilityZone(
+        availability_zone.to_string(),
+    ))
 }
 
+type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Clone, Debug)]
+pub enum Error {
+    HttpRequest(String),
+    IoError(String),
+    UnknownAvailabilityZone(String),
+}
+
+impl From<ureq::Error> for Error {
+    fn from(error: ureq::Error) -> Error {
+        Error::HttpRequest(format!("{:?}", error))
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(error: std::io::Error) -> Error {
+        Error::IoError(format!("{:?}", error))
+    }
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Error::HttpRequest(s) => write!(f, "Http Request Error: {}", s),
+            Error::IoError(s) => write!(f, "IO Error: {}", s),
+            Error::UnknownAvailabilityZone(s) => write!(f, "Unknown AvailabilityZone: {}", s),
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
+}
+
+/// `InstanceMetadataClient` provides an API for fetching common fields
+/// from the EC2 Instance Metadata API: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
+///
+///
+/// # Examples:
+/// ```
+/// use aws_instance_metadata::InstanceMetadataClient;
+/// let client = aws_instance_metadata::InstanceMetadataClient::new();
+/// let instance_metadata = client.get().expect("Couldn't get the instance metadata.");
+/// ````
 #[derive(Debug, Default)]
 pub struct InstanceMetadataClient;
 
@@ -69,46 +118,43 @@ impl InstanceMetadataClient {
         Self {}
     }
 
-    fn get_token(&self) -> Option<String> {
+    fn get_token(&self) -> Result<String> {
         const TOKEN_API_URL: &str = "http://169.254.169.254/latest/api/token";
 
         let resp = ureq::put(TOKEN_API_URL)
             .set("X-aws-ec2-metadata-token-ttl-seconds", "21600")
             .call();
 
-        resp.into_string().ok()
+        let token = resp.into_string()?;
+        Ok(token)
     }
 
-    pub fn get(&self) -> Option<InstanceMetadata> {
+    /// Get the instance metadata for the machine.
+    pub fn get(&self) -> Result<InstanceMetadata> {
         let token = self.get_token()?;
         let instance_id = ureq::get(MetadataUrls::InstanceId.into())
             .set("X-aws-ec2-metadata-token", &token)
             .call()
-            .into_string()
-            .ok()?;
+            .into_string()?;
 
         let ident_creds = ureq::get(MetadataUrls::AccountId.into())
             .set("X-aws-ec2-metadata-token", &token)
             .call()
-            .into_string()
-            .ok()?;
+            .into_string()?;
         let account_id = identity_credentials_to_account_id(&ident_creds);
 
         let ami_id = ureq::get(MetadataUrls::AmiId.into())
             .set("X-aws-ec2-metadata-token", &token)
             .call()
-            .into_string()
-            .ok()?;
+            .into_string()?;
 
         let availability_zone = ureq::get(MetadataUrls::AvailabilityZone.into())
             .set("X-aws-ec2-metadata-token", &token)
             .call()
-            .into_string()
-            .ok()?;
+            .into_string()?;
         let region = availability_zone_to_region(&availability_zone)?;
 
         let metadata = InstanceMetadata {
-            _unused: (),
             region,
             availability_zone,
             instance_id,
@@ -116,18 +162,35 @@ impl InstanceMetadataClient {
             ami_id,
         };
 
-        Some(metadata)
+        Ok(metadata)
     }
 }
 
+/// `InstanceMetadata` holds the fetched instance metadata. Fields
+/// on this struct may be incomplete if AWS has updated the fields
+/// or if they haven't been explicitly provided.
 #[derive(Debug, Clone)]
 pub struct InstanceMetadata {
-    _unused: (),
-    region: &'static str,
-    availability_zone: String,
-    instance_id: String,
-    account_id: String,
-    ami_id: String,
+    /// AWS Region
+    pub region: &'static str,
+
+    /// AWS Availability Zone
+    pub availability_zone: String,
+
+    /// AWS Instance Id
+    pub instance_id: String,
+
+    /// AWS Account Id
+    pub account_id: String,
+
+    /// AWS AMS Id
+    pub ami_id: String,
+}
+
+impl std::fmt::Display for InstanceMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[cfg(test)]

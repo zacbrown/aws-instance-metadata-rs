@@ -1,10 +1,11 @@
 [package]
 name = "aws-instance-metadata"
 version = "0.1.0"
-authors = ["zbrown"]
+authors = ["Zac Brown <zacbrown@users.noreply.github.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+homepage = "https://github.com/zacbrown/aws-instance-metadata-rs/"
+repository = "https://github.com/zacbrown/aws-instance-metadata-rs/"
+license-file = "LICENSE"
 
 [dependencies]
 json = "0.12"
