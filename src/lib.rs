@@ -103,11 +103,10 @@ impl std::error::Error for Error {
 /// `InstanceMetadataClient` provides an API for fetching common fields
 /// from the EC2 Instance Metadata API: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
 ///
-///
 /// # Examples:
 /// ```
-/// use aws_instance_metadata::InstanceMetadataClient;
-/// let client = aws_instance_metadata::InstanceMetadataClient::new();
+/// use ec2_instance_metadata::InstanceMetadataClient;
+/// let client = ec2_instance_metadata::InstanceMetadataClient::new();
 /// let instance_metadata = client.get().expect("Couldn't get the instance metadata.");
 /// ````
 #[derive(Debug, Default)]
