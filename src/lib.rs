@@ -24,9 +24,9 @@ impl Into<&'static str> for MetadataUrls {
     }
 }
 
-fn identity_credentials_to_account_id(ident_creds: &str) -> String {
-    let parsed = json::parse(ident_creds).unwrap();
-    parsed["AccountId"].to_string()
+fn identity_credentials_to_account_id(ident_creds: &str) -> Result<String> {
+    let parsed = json::parse(ident_creds)?;
+    Ok(parsed["AccountId"].to_string())
 }
 
 fn availability_zone_to_region(availability_zone: &str) -> Result<&'static str> {
@@ -70,6 +70,7 @@ pub enum Error {
     HttpRequest(String),
     IoError(String),
     UnknownAvailabilityZone(String),
+    JsonError(String),
 }
 
 impl From<ureq::Error> for Error {
@@ -84,12 +85,19 @@ impl From<std::io::Error> for Error {
     }
 }
 
+impl From<json::Error> for Error {
+    fn from(error: json::Error) -> Error {
+        Error::JsonError(format!("{:?}", error))
+    }
+}
+
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Error::HttpRequest(s) => write!(f, "Http Request Error: {}", s),
             Error::IoError(s) => write!(f, "IO Error: {}", s),
             Error::UnknownAvailabilityZone(s) => write!(f, "Unknown AvailabilityZone: {}", s),
+            Error::JsonError(s) => write!(f, "JSON parsing error: {}", s),
         }
     }
 }
@@ -140,7 +148,7 @@ impl InstanceMetadataClient {
             .set("X-aws-ec2-metadata-token", &token)
             .call()
             .into_string()?;
-        let account_id = identity_credentials_to_account_id(&ident_creds);
+        let account_id = identity_credentials_to_account_id(&ident_creds)?;
 
         let ami_id = ureq::get(MetadataUrls::AmiId.into())
             .set("X-aws-ec2-metadata-token", &token)
