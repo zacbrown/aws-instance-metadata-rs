@@ -1,6 +1,6 @@
 [package]
 name = "ec2_instance_metadata"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Zac Brown <zacbrown@users.noreply.github.com>"]
 edition = "2018"
 description = "A crate for fetching AWS EC2 instance metadata."
