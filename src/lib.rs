@@ -121,6 +121,8 @@ impl std::error::Error for Error {
 pub struct InstanceMetadataClient;
 
 impl InstanceMetadataClient {
+    const REQUEST_TIMEOUT_MS: u64 = 2000; // 2 seconds
+
     pub fn new() -> Self {
         Self {}
     }
@@ -130,6 +132,7 @@ impl InstanceMetadataClient {
 
         let resp = ureq::put(TOKEN_API_URL)
             .set("X-aws-ec2-metadata-token-ttl-seconds", "21600")
+            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
             .call();
 
         let token = resp.into_string()?;
@@ -141,22 +144,26 @@ impl InstanceMetadataClient {
         let token = self.get_token()?;
         let instance_id = ureq::get(MetadataUrls::InstanceId.into())
             .set("X-aws-ec2-metadata-token", &token)
+            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
             .call()
             .into_string()?;
 
         let ident_creds = ureq::get(MetadataUrls::AccountId.into())
             .set("X-aws-ec2-metadata-token", &token)
+            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
             .call()
             .into_string()?;
         let account_id = identity_credentials_to_account_id(&ident_creds)?;
 
         let ami_id = ureq::get(MetadataUrls::AmiId.into())
             .set("X-aws-ec2-metadata-token", &token)
+            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
             .call()
             .into_string()?;
 
         let availability_zone = ureq::get(MetadataUrls::AvailabilityZone.into())
             .set("X-aws-ec2-metadata-token", &token)
+            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
             .call()
             .into_string()?;
         let region = availability_zone_to_region(&availability_zone)?;
