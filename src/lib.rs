@@ -7,6 +7,7 @@ enum MetadataUrls {
     AmiId,
     AccountId,
     AvailabilityZone,
+    InstanceType,
 }
 
 impl Into<&'static str> for MetadataUrls {
@@ -20,6 +21,7 @@ impl Into<&'static str> for MetadataUrls {
             MetadataUrls::AvailabilityZone => {
                 "http://169.254.169.254/latest/meta-data/placement/availability-zone"
             }
+            MetadataUrls::InstanceType => "http://169.254.169.254/latest/meta-data/instance-type",
         }
     }
 }
@@ -168,12 +170,19 @@ impl InstanceMetadataClient {
             .into_string()?;
         let region = availability_zone_to_region(&availability_zone)?;
 
+        let instance_type = ureq::get(MetadataUrls::InstanceType.into())
+            .set("X-aws-ec2-metadata-token", &token)
+            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
+            .call()
+            .into_string()?;
+
         let metadata = InstanceMetadata {
             region,
             availability_zone,
             instance_id,
             account_id,
             ami_id,
+            instance_type,
         };
 
         Ok(metadata)
@@ -199,18 +208,13 @@ pub struct InstanceMetadata {
 
     /// AWS AMS Id
     pub ami_id: String,
+
+    /// AWS Instance Type
+    pub instance_type: String,
 }
 
 impl std::fmt::Display for InstanceMetadata {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{:?}", self)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
     }
 }
