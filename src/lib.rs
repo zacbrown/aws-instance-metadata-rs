@@ -8,6 +8,9 @@ enum MetadataUrls {
     AccountId,
     AvailabilityZone,
     InstanceType,
+    Hostname,
+    LocalHostname,
+    PublicHostname,
 }
 
 impl Into<&'static str> for MetadataUrls {
@@ -22,6 +25,9 @@ impl Into<&'static str> for MetadataUrls {
                 "http://169.254.169.254/latest/meta-data/placement/availability-zone"
             }
             MetadataUrls::InstanceType => "http://169.254.169.254/latest/meta-data/instance-type",
+            MetadataUrls::Hostname => "http://169.254.169.254/latest/meta-data/hostname",
+            MetadataUrls::LocalHostname => "http://169.254.169.254/latest/meta-data/local-hostname",
+            MetadataUrls::PublicHostname => "http://169.254.169.254/latest/meta-data/public-hostname",
         }
     }
 }
@@ -176,6 +182,24 @@ impl InstanceMetadataClient {
             .call()
             .into_string()?;
 
+        let hostname = ureq::get(MetadataUrls::Hostname.into())
+            .set("X-aws-ec2-metadata-token", &token)
+            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
+            .call()
+            .into_string()?;
+
+        let local_hostname = ureq::get(MetadataUrls::LocalHostname.into())
+            .set("X-aws-ec2-metadata-token", &token)
+            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
+            .call()
+            .into_string()?;
+
+        let public_hostname = ureq::get(MetadataUrls::PublicHostname.into())
+            .set("X-aws-ec2-metadata-token", &token)
+            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
+            .call()
+            .into_string()?;
+
         let metadata = InstanceMetadata {
             region,
             availability_zone,
@@ -183,6 +207,9 @@ impl InstanceMetadataClient {
             account_id,
             ami_id,
             instance_type,
+            hostname,
+            local_hostname,
+            public_hostname,
         };
 
         Ok(metadata)
@@ -211,6 +238,15 @@ pub struct InstanceMetadata {
 
     /// AWS Instance Type
     pub instance_type: String,
+
+    /// AWS Instance Local Hostname
+    pub local_hostname: String,
+
+    /// AWS Instance Hostname
+    pub hostname: String,
+
+    /// AWS Instance Public Hostname
+    pub public_hostname: String,
 }
 
 impl std::fmt::Display for InstanceMetadata {
