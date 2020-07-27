@@ -1,13 +1,14 @@
 [package]
 name = "ec2_instance_metadata"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Zac Brown <zacbrown@users.noreply.github.com>"]
 edition = "2018"
 description = "A crate for fetching AWS EC2 instance metadata."
 homepage = "https://github.com/zacbrown/ec2-instance-metadata-rs/"
 repository = "https://github.com/zacbrown/ec2-instance-metadata-rs/"
+license = "MIT"
 license-file = "LICENSE"
 
 [dependencies]
 json = "0.12"
-ureq = "1.2"
+ureq = "1.3"
