@@ -7,7 +7,6 @@ description = "A crate for fetching AWS EC2 instance metadata."
 homepage = "https://github.com/zacbrown/ec2-instance-metadata-rs/"
 repository = "https://github.com/zacbrown/ec2-instance-metadata-rs/"
 license = "MIT"
-license-file = "LICENSE"
 
 [dependencies]
 json = "0.12"
