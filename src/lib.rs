@@ -79,6 +79,7 @@ pub enum Error {
     IoError(String),
     UnknownAvailabilityZone(String),
     JsonError(String),
+    NotFound(&'static str), // Reported for static URIs we fetch.
 }
 
 impl From<ureq::Error> for Error {
@@ -106,6 +107,7 @@ impl std::fmt::Display for Error {
             Error::IoError(s) => write!(f, "IO Error: {}", s),
             Error::UnknownAvailabilityZone(s) => write!(f, "Unknown AvailabilityZone: {}", s),
             Error::JsonError(s) => write!(f, "JSON parsing error: {}", s),
+            Error::NotFound(s) => write!(f, "Not found: {}", s),
         }
     }
 }
@@ -158,7 +160,7 @@ impl InstanceMetadataClient {
         let instance_id = if instance_id_resp.ok() {
             instance_id_resp.into_string()?
         } else {
-            Default::default()
+            return Err(Error::NotFound(MetadataUrls::InstanceId.into()))
         };
 
         let ident_creds_resp = ureq::get(MetadataUrls::AccountId.into())
@@ -170,7 +172,7 @@ impl InstanceMetadataClient {
             let ident_creds = ident_creds_resp.into_string()?;
             identity_credentials_to_account_id(&ident_creds)?
         } else {
-            Default::default()
+            return Err(Error::NotFound(MetadataUrls::AccountId.into()))
         };
 
         let ami_id_resp = ureq::get(MetadataUrls::AmiId.into())
@@ -181,7 +183,7 @@ impl InstanceMetadataClient {
         let ami_id = if ami_id_resp.ok() {
             ami_id_resp.into_string()?
         } else {
-            Default::default()
+            return Err(Error::NotFound(MetadataUrls::AmiId.into()))
         };
 
         let availability_zone_resp = ureq::get(MetadataUrls::AvailabilityZone.into())
@@ -194,7 +196,7 @@ impl InstanceMetadataClient {
             let region = availability_zone_to_region(&availability_zone)?;
             (availability_zone, region)
         } else {
-            (Default::default(), Default::default())
+            return Err(Error::NotFound(MetadataUrls::AvailabilityZone.into()))
         };
 
         let instance_type_resp = ureq::get(MetadataUrls::InstanceType.into())
@@ -205,7 +207,7 @@ impl InstanceMetadataClient {
         let instance_type = if instance_type_resp.ok() {
             instance_type_resp.into_string()?
         } else {
-            Default::default()
+            return Err(Error::NotFound(MetadataUrls::InstanceType.into()))
         };
 
         let hostname_resp = ureq::get(MetadataUrls::Hostname.into())
@@ -216,7 +218,7 @@ impl InstanceMetadataClient {
         let hostname = if hostname_resp.ok() {
             hostname_resp.into_string()?
         } else {
-            Default::default()
+            return Err(Error::NotFound(MetadataUrls::Hostname.into()))
         };
 
         let local_hostname_resp = ureq::get(MetadataUrls::LocalHostname.into())
@@ -227,7 +229,7 @@ impl InstanceMetadataClient {
         let local_hostname = if local_hostname_resp.ok() {
             local_hostname_resp.into_string()?
         } else {
-            Default::default()
+            return Err(Error::NotFound(MetadataUrls::LocalHostname.into()))
         };
 
         let public_hostname_resp = ureq::get(MetadataUrls::PublicHostname.into())
@@ -238,7 +240,7 @@ impl InstanceMetadataClient {
         let public_hostname = if public_hostname_resp.ok() {
             public_hostname_resp.into_string()?
         } else {
-            Default::default()
+            return Err(Error::NotFound(MetadataUrls::PublicHostname.into()))
         };
 
         let metadata = InstanceMetadata {
