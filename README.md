@@ -6,7 +6,7 @@ an EC2 instance. This API makes use of the v2 API to remain future facing.
 Add the following line to your `Cargo.toml`:
 
 ```
-ec2_instance_metadata = "0.2"
+ec2_instance_metadata = "0.3"
 ```
 
 # Example Code:
