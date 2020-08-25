@@ -27,7 +27,9 @@ impl Into<&'static str> for MetadataUrls {
             MetadataUrls::InstanceType => "http://169.254.169.254/latest/meta-data/instance-type",
             MetadataUrls::Hostname => "http://169.254.169.254/latest/meta-data/hostname",
             MetadataUrls::LocalHostname => "http://169.254.169.254/latest/meta-data/local-hostname",
-            MetadataUrls::PublicHostname => "http://169.254.169.254/latest/meta-data/public-hostname",
+            MetadataUrls::PublicHostname => {
+                "http://169.254.169.254/latest/meta-data/public-hostname"
+            }
         }
     }
 }
@@ -160,7 +162,7 @@ impl InstanceMetadataClient {
         let instance_id = if instance_id_resp.ok() {
             instance_id_resp.into_string()?
         } else {
-            return Err(Error::NotFound(MetadataUrls::InstanceId.into()))
+            return Err(Error::NotFound(MetadataUrls::InstanceId.into()));
         };
 
         let ident_creds_resp = ureq::get(MetadataUrls::AccountId.into())
@@ -172,7 +174,7 @@ impl InstanceMetadataClient {
             let ident_creds = ident_creds_resp.into_string()?;
             identity_credentials_to_account_id(&ident_creds)?
         } else {
-            return Err(Error::NotFound(MetadataUrls::AccountId.into()))
+            return Err(Error::NotFound(MetadataUrls::AccountId.into()));
         };
 
         let ami_id_resp = ureq::get(MetadataUrls::AmiId.into())
@@ -183,7 +185,7 @@ impl InstanceMetadataClient {
         let ami_id = if ami_id_resp.ok() {
             ami_id_resp.into_string()?
         } else {
-            return Err(Error::NotFound(MetadataUrls::AmiId.into()))
+            return Err(Error::NotFound(MetadataUrls::AmiId.into()));
         };
 
         let availability_zone_resp = ureq::get(MetadataUrls::AvailabilityZone.into())
@@ -196,7 +198,7 @@ impl InstanceMetadataClient {
             let region = availability_zone_to_region(&availability_zone)?;
             (availability_zone, region)
         } else {
-            return Err(Error::NotFound(MetadataUrls::AvailabilityZone.into()))
+            return Err(Error::NotFound(MetadataUrls::AvailabilityZone.into()));
         };
 
         let instance_type_resp = ureq::get(MetadataUrls::InstanceType.into())
@@ -207,7 +209,7 @@ impl InstanceMetadataClient {
         let instance_type = if instance_type_resp.ok() {
             instance_type_resp.into_string()?
         } else {
-            return Err(Error::NotFound(MetadataUrls::InstanceType.into()))
+            return Err(Error::NotFound(MetadataUrls::InstanceType.into()));
         };
 
         let hostname_resp = ureq::get(MetadataUrls::Hostname.into())
@@ -218,7 +220,7 @@ impl InstanceMetadataClient {
         let hostname = if hostname_resp.ok() {
             hostname_resp.into_string()?
         } else {
-            return Err(Error::NotFound(MetadataUrls::Hostname.into()))
+            return Err(Error::NotFound(MetadataUrls::Hostname.into()));
         };
 
         let local_hostname_resp = ureq::get(MetadataUrls::LocalHostname.into())
@@ -229,7 +231,7 @@ impl InstanceMetadataClient {
         let local_hostname = if local_hostname_resp.ok() {
             local_hostname_resp.into_string()?
         } else {
-            return Err(Error::NotFound(MetadataUrls::LocalHostname.into()))
+            return Err(Error::NotFound(MetadataUrls::LocalHostname.into()));
         };
 
         let public_hostname_resp = ureq::get(MetadataUrls::PublicHostname.into())
@@ -237,10 +239,12 @@ impl InstanceMetadataClient {
             .timeout_connect(Self::REQUEST_TIMEOUT_MS)
             .call();
 
+        // "public-hostname" isn't always available - the instance must be configured
+        // to support having one assigned.
         let public_hostname = if public_hostname_resp.ok() {
-            public_hostname_resp.into_string()?
+            Some(public_hostname_resp.into_string()?)
         } else {
-            return Err(Error::NotFound(MetadataUrls::PublicHostname.into()))
+            None
         };
 
         let metadata = InstanceMetadata {
@@ -264,32 +268,33 @@ impl InstanceMetadataClient {
 /// or if they haven't been explicitly provided.
 #[derive(Debug, Clone)]
 pub struct InstanceMetadata {
-    /// AWS Region
+    /// AWS Region - always available
     pub region: &'static str,
 
-    /// AWS Availability Zone
+    /// AWS Availability Zone - always available
     pub availability_zone: String,
 
-    /// AWS Instance Id
+    /// AWS Instance Id - always available
     pub instance_id: String,
 
-    /// AWS Account Id
+    /// AWS Account Id - always available, marked as Internal Only per:
+    /// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-categories.html
     pub account_id: String,
 
-    /// AWS AMS Id
+    /// AWS AMS Id - always available
     pub ami_id: String,
 
-    /// AWS Instance Type
+    /// AWS Instance Type - always available
     pub instance_type: String,
 
-    /// AWS Instance Local Hostname
+    /// AWS Instance Local Hostname - always available
     pub local_hostname: String,
 
-    /// AWS Instance Hostname
+    /// AWS Instance Hostname - always available
     pub hostname: String,
 
-    /// AWS Instance Public Hostname
-    pub public_hostname: String,
+    /// AWS Instance Public Hostname - optionally available
+    pub public_hostname: Option<String>,
 }
 
 impl std::fmt::Display for InstanceMetadata {
