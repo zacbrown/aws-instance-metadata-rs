@@ -13,6 +13,7 @@ enum MetadataUrls {
     PublicHostname,
 }
 
+#[allow(clippy::from_over_into)]
 impl Into<&'static str> for MetadataUrls {
     fn into(self) -> &'static str {
         match self {
