@@ -1,5 +1,6 @@
 extern crate json;
 extern crate ureq;
+use std::time::Duration;
 
 #[derive(Clone, Copy)]
 enum MetadataUrls {
@@ -134,7 +135,7 @@ impl std::error::Error for Error {
 pub struct InstanceMetadataClient;
 
 impl InstanceMetadataClient {
-    const REQUEST_TIMEOUT_MS: u64 = 2000; // 2 seconds
+    const REQUEST_TIMEOUT: Duration = Duration::from_secs(2);
 
     pub fn new() -> Self {
         Self {}
@@ -143,58 +144,71 @@ impl InstanceMetadataClient {
     fn get_token(&self) -> Result<String> {
         const TOKEN_API_URL: &str = "http://169.254.169.254/latest/api/token";
 
-        let resp = ureq::put(TOKEN_API_URL)
-            .set("X-aws-ec2-metadata-token-ttl-seconds", "21600")
-            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
-            .call();
+        let agent = ureq::AgentBuilder::new()
+            .timeout_connect(Self::REQUEST_TIMEOUT)
+            .build();
 
-        let token = resp.into_string()?;
-        Ok(token)
+        let resp = agent
+            .put(TOKEN_API_URL)
+            .set("X-aws-ec2-metadata-token-ttl-seconds", "21600")
+            .call();
+        if let Ok(resp) = resp {
+            let token = resp.into_string()?;
+            Ok(token)
+        } else {
+            let err = resp.unwrap_err();
+            Err(Error::from(err))
+        }
     }
 
     /// Get the instance metadata for the machine.
     pub fn get(&self) -> Result<InstanceMetadata> {
         let token = self.get_token()?;
-        let instance_id_resp = ureq::get(MetadataUrls::InstanceId.into())
+
+        let agent = ureq::AgentBuilder::new()
+            .timeout_connect(Self::REQUEST_TIMEOUT)
+            .build();
+
+        let instance_id_resp = agent
+            .get(MetadataUrls::InstanceId.into())
             .set("X-aws-ec2-metadata-token", &token)
-            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
             .call();
 
-        let instance_id = if instance_id_resp.ok() {
+        let instance_id = if let Ok(instance_id_resp) = instance_id_resp {
             instance_id_resp.into_string()?
         } else {
             return Err(Error::NotFound(MetadataUrls::InstanceId.into()));
         };
 
-        let ident_creds_resp = ureq::get(MetadataUrls::AccountId.into())
+        let ident_creds_resp = agent
+            .get(MetadataUrls::AccountId.into())
             .set("X-aws-ec2-metadata-token", &token)
-            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
             .call();
 
-        let account_id = if ident_creds_resp.ok() {
+        let account_id = if let Ok(ident_creds_resp) = ident_creds_resp {
             let ident_creds = ident_creds_resp.into_string()?;
             identity_credentials_to_account_id(&ident_creds)?
         } else {
             return Err(Error::NotFound(MetadataUrls::AccountId.into()));
         };
 
-        let ami_id_resp = ureq::get(MetadataUrls::AmiId.into())
+        let ami_id_resp = agent
+            .get(MetadataUrls::AmiId.into())
             .set("X-aws-ec2-metadata-token", &token)
-            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
             .call();
 
-        let ami_id = if ami_id_resp.ok() {
+        let ami_id = if let Ok(ami_id_resp) = ami_id_resp {
             ami_id_resp.into_string()?
         } else {
             return Err(Error::NotFound(MetadataUrls::AmiId.into()));
         };
 
-        let availability_zone_resp = ureq::get(MetadataUrls::AvailabilityZone.into())
+        let availability_zone_resp = agent
+            .get(MetadataUrls::AvailabilityZone.into())
             .set("X-aws-ec2-metadata-token", &token)
-            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
             .call();
 
-        let (availability_zone, region) = if availability_zone_resp.ok() {
+        let (availability_zone, region) = if let Ok(availability_zone_resp) = availability_zone_resp {
             let availability_zone = availability_zone_resp.into_string()?;
             let region = availability_zone_to_region(&availability_zone)?;
             (availability_zone, region)
@@ -202,47 +216,45 @@ impl InstanceMetadataClient {
             return Err(Error::NotFound(MetadataUrls::AvailabilityZone.into()));
         };
 
-        let instance_type_resp = ureq::get(MetadataUrls::InstanceType.into())
+        let instance_type_resp = agent
+            .get(MetadataUrls::InstanceType.into())
             .set("X-aws-ec2-metadata-token", &token)
-            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
             .call();
-
-        let instance_type = if instance_type_resp.ok() {
+        let instance_type = if let Ok(instance_type_resp) = instance_type_resp {
             instance_type_resp.into_string()?
         } else {
             return Err(Error::NotFound(MetadataUrls::InstanceType.into()));
         };
 
-        let hostname_resp = ureq::get(MetadataUrls::Hostname.into())
+        let hostname_resp = agent
+            .get(MetadataUrls::Hostname.into())
             .set("X-aws-ec2-metadata-token", &token)
-            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
             .call();
 
-        let hostname = if hostname_resp.ok() {
+        let hostname = if let Ok(hostname_resp) = hostname_resp {
             hostname_resp.into_string()?
         } else {
             return Err(Error::NotFound(MetadataUrls::Hostname.into()));
         };
 
-        let local_hostname_resp = ureq::get(MetadataUrls::LocalHostname.into())
+        let local_hostname_resp = agent
+            .get(MetadataUrls::LocalHostname.into())
             .set("X-aws-ec2-metadata-token", &token)
-            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
             .call();
+            let local_hostname = if let Ok(local_hostname_resp) = local_hostname_resp {
+                local_hostname_resp.into_string()?
+            } else {
+                return Err(Error::NotFound(MetadataUrls::LocalHostname.into()));
+            };
 
-        let local_hostname = if local_hostname_resp.ok() {
-            local_hostname_resp.into_string()?
-        } else {
-            return Err(Error::NotFound(MetadataUrls::LocalHostname.into()));
-        };
-
-        let public_hostname_resp = ureq::get(MetadataUrls::PublicHostname.into())
+        let public_hostname_resp = agent
+            .get(MetadataUrls::PublicHostname.into())
             .set("X-aws-ec2-metadata-token", &token)
-            .timeout_connect(Self::REQUEST_TIMEOUT_MS)
             .call();
 
         // "public-hostname" isn't always available - the instance must be configured
         // to support having one assigned.
-        let public_hostname = if public_hostname_resp.ok() {
+        let public_hostname = if let Ok(public_hostname_resp) = public_hostname_resp {
             Some(public_hostname_resp.into_string()?)
         } else {
             None
